@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://nirav0044.github.io/saloni-portfolio/sitemap.xml
