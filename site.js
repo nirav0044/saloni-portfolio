@@ -29,7 +29,7 @@
     var a = e.target.closest && e.target.closest('a[href]');
     if (!a || reduce || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     var href = a.getAttribute('href');
-    if (a.hasAttribute('data-zoom') || a.target === '_blank' || /^(#|mailto:|tel:)/.test(href) || a.origin !== location.origin) return;
+    if (a.target === '_blank' || /^(#|mailto:|tel:)/.test(href) || a.origin !== location.origin) return;
     if (a.pathname === location.pathname) { closeMenu(); return; }
     e.preventDefault();
     doc.classList.add('leaving');
@@ -50,7 +50,7 @@
   function onScroll() { head.classList.toggle('scrolled', window.scrollY > 8); }
   window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
   var links = $$('.nav a');
-  var map = { about: 'about', education: 'about', experience: 'experience', tools: 'experience', work: 'work', typography: 'work', contact: 'contact' };
+  var map = { about: 'about', work: 'work', experience: 'experience', skills: 'experience', play: 'play', contact: 'contact' };
   if ('IntersectionObserver' in window && $('.p-home')) {
     var so = new IntersectionObserver(function (es) {
       es.forEach(function (en) {
@@ -72,32 +72,35 @@
   function closeMenu() { if (btn && btn.getAttribute('aria-expanded') === 'true') setMenu(false); }
   if (btn && menu) btn.addEventListener('click', function () { setMenu(btn.getAttribute('aria-expanded') !== 'true'); });
 
-  /* ---- enlarge a portfolio page ---- */
-  var zoom = $('.zoom'), zimg = zoom && $('img', zoom), last = null;
-  function closeZoom() {
-    if (!zoom || zoom.hidden) return;
-    zoom.classList.remove('open'); document.body.style.overflow = '';
-    setTimeout(function () { zoom.hidden = true; zimg.removeAttribute('src'); }, 360);
-    if (last) last.focus();
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+  /* ---- back to top ---- */
+  var totop = $('.totop');
+  if (totop) {
+    window.addEventListener('scroll', function () { totop.classList.toggle('show', window.scrollY > window.innerHeight * 0.8); }, { passive: true });
+    totop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); });
   }
-  if (zoom) {
-    document.addEventListener('click', function (e) {
-      var a = e.target.closest('a[data-zoom]');
-      if (!a) return;
-      e.preventDefault(); last = a;
-      zimg.src = a.getAttribute('href'); zimg.alt = (a.querySelector('img') || {}).alt || '';
-      zoom.hidden = false; zoom.offsetHeight; zoom.classList.add('open'); document.body.style.overflow = 'hidden';
-      $('button', zoom).focus();
-    });
-    zoom.addEventListener('click', closeZoom);
+
+  /* ---- hero pinboard drifts a little with the pointer ---- */
+  var pin = $('.pin');
+  if (pin && fine && !reduce) {
+    var items = $$('[data-depth]', pin), px = 0, py = 0, qx = 0, qy = 0;
+    window.addEventListener('mousemove', function (e) { px = e.clientX / window.innerWidth - 0.5; py = e.clientY / window.innerHeight - 0.5; }, { passive: true });
+    (function drift() {
+      qx += (px - qx) * 0.06; qy += (py - qy) * 0.06;
+      if (window.scrollY < window.innerHeight) items.forEach(function (el) {
+        var d = parseFloat(el.dataset.depth);
+        el.style.translate = (qx * d).toFixed(1) + 'px ' + (qy * d).toFixed(1) + 'px';
+      });
+      requestAnimationFrame(drift);
+    })();
   }
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeZoom(); closeMenu(); } });
 
   /* ---- a quiet cursor dot, desktop only ---- */
   if (fine && !reduce) {
     var cur = $('.cursor'), cx = -50, cy = -50, tx = -50, ty = -50;
     document.addEventListener('mousemove', function (e) { tx = e.clientX; ty = e.clientY; }, { passive: true });
-    document.addEventListener('mouseover', function (e) { cur.classList.toggle('big', !!e.target.closest('[data-cursor],[data-zoom]')); });
+    document.addEventListener('mouseover', function (e) { cur.classList.toggle('big', !!e.target.closest('[data-cursor]')); });
     (function loop() {
       cx += (tx - cx) * 0.2; cy += (ty - cy) * 0.2;
       cur.style.transform = 'translate3d(' + cx.toFixed(1) + 'px,' + cy.toFixed(1) + 'px,0)';
