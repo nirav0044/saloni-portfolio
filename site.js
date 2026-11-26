@@ -6,7 +6,7 @@
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
 
-  /* ---- keep oversized headlines inside their column ---- */
+  /* ---- oversized headlines: the name fills its column, project titles never overflow ---- */
   function fit() {
     $$('.hero-title, .cs-t').forEach(function (el) {
       el.style.fontSize = '';
@@ -14,7 +14,8 @@
       var widest = Math.max.apply(null, $$('.ln > span', el).map(function (s) {
         var r = document.createRange(); r.selectNodeContents(s); return r.getBoundingClientRect().width;
       }));
-      if (widest > room) el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * room / widest * 0.99) + 'px';
+      if (widest > 0 && (widest > room || el.hasAttribute('data-fill')))
+        el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * room / widest * 0.992) + 'px';
     });
   }
   fit();
@@ -45,12 +46,22 @@
     revs.forEach(function (el) { io.observe(el); });
   } else { revs.forEach(function (el) { el.classList.add('in'); }); }
 
-  /* ---- header line + current section ---- */
-  var head = $('.head');
-  function onScroll() { head.classList.toggle('scrolled', window.scrollY > 8); }
-  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  /* ---- header line, current section, gentle parallax ---- */
+  var head = $('.head'), pars = reduce ? [] : $$('[data-par]'), ticking = false;
+  function onScroll() {
+    ticking = false;
+    head.classList.toggle('scrolled', window.scrollY > 8);
+    var vh = window.innerHeight;
+    pars.forEach(function (el) {
+      var r = el.parentElement.getBoundingClientRect();
+      if (r.bottom < -100 || r.top > vh + 100) return;
+      el.style.translate = '0 ' + ((r.top + r.height / 2 - vh / 2) * parseFloat(el.dataset.par)).toFixed(1) + 'px';
+    });
+  }
+  window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+  onScroll();
   var links = $$('.nav a');
-  var map = { about: 'about', work: 'work', experience: 'experience', skills: 'experience', play: 'play', contact: 'contact' };
+  var map = { top: '', work: 'work', about: 'about', experience: 'experience', education: 'experience', tools: 'experience', contact: 'contact' };
   if ('IntersectionObserver' in window && $('.p-home')) {
     var so = new IntersectionObserver(function (es) {
       es.forEach(function (en) {
@@ -59,7 +70,6 @@
       });
     }, { rootMargin: '-45% 0px -50% 0px' });
     Object.keys(map).forEach(function (id) { var s = document.getElementById(id); if (s) so.observe(s); });
-    var hero = $('.hero'); if (hero) so.observe(hero);
   } else if ($('.p-case')) { links.forEach(function (l) { l.classList.toggle('on', l.dataset.nav === 'work'); }); }
 
   /* ---- mobile menu ---- */
@@ -71,39 +81,29 @@
   }
   function closeMenu() { if (btn && btn.getAttribute('aria-expanded') === 'true') setMenu(false); }
   if (btn && menu) btn.addEventListener('click', function () { setMenu(btn.getAttribute('aria-expanded') !== 'true'); });
-
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
 
-  /* ---- back to top ---- */
-  var totop = $('.totop');
-  if (totop) {
-    window.addEventListener('scroll', function () { totop.classList.toggle('show', window.scrollY > window.innerHeight * 0.8); }, { passive: true });
-    totop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); });
-  }
-
-  /* ---- hero pinboard drifts a little with the pointer ---- */
-  var pin = $('.pin');
-  if (pin && fine && !reduce) {
-    var items = $$('[data-depth]', pin), px = 0, py = 0, qx = 0, qy = 0;
-    window.addEventListener('mousemove', function (e) { px = e.clientX / window.innerWidth - 0.5; py = e.clientY / window.innerHeight - 0.5; }, { passive: true });
-    (function drift() {
-      qx += (px - qx) * 0.06; qy += (py - qy) * 0.06;
-      if (window.scrollY < window.innerHeight) items.forEach(function (el) {
-        var d = parseFloat(el.dataset.depth);
-        el.style.translate = (qx * d).toFixed(1) + 'px ' + (qy * d).toFixed(1) + 'px';
-      });
-      requestAnimationFrame(drift);
-    })();
-  }
-
-  /* ---- a quiet cursor dot, desktop only ---- */
+  /* ---- pointer: hero shapes drift, and a small cursor follows ---- */
   if (fine && !reduce) {
-    var cur = $('.cursor'), cx = -50, cy = -50, tx = -50, ty = -50;
+    var cur = $('.cursor'), cx = -50, cy = -50, tx = -50, ty = -50, qx = 0, qy = 0;
+    var drift = $$('.hero [data-depth]');
     document.addEventListener('mousemove', function (e) { tx = e.clientX; ty = e.clientY; }, { passive: true });
-    document.addEventListener('mouseover', function (e) { cur.classList.toggle('big', !!e.target.closest('[data-cursor]')); });
+    document.addEventListener('mouseover', function (e) {
+      var l = e.target.closest('[data-cursor]'), a = e.target.closest('a,button');
+      cur.classList.toggle('label', !!l); cur.classList.toggle('link', !l && !!a);
+      cur.textContent = l ? l.dataset.cursor : '';
+    });
     (function loop() {
       cx += (tx - cx) * 0.2; cy += (ty - cy) * 0.2;
       cur.style.transform = 'translate3d(' + cx.toFixed(1) + 'px,' + cy.toFixed(1) + 'px,0)';
+      if (drift.length && window.scrollY < window.innerHeight) {
+        var px = tx / window.innerWidth - 0.5, py = ty / window.innerHeight - 0.5;
+        qx += (px - qx) * 0.05; qy += (py - qy) * 0.05;
+        drift.forEach(function (el) {
+          var d = parseFloat(el.dataset.depth);
+          el.style.translate = (qx * d * 2).toFixed(1) + 'px ' + (qy * d * 2).toFixed(1) + 'px';
+        });
+      }
       requestAnimationFrame(loop);
     })();
   }
